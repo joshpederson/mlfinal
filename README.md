@@ -8,5 +8,5 @@ https://pettingzoo.farama.org/
 https://gymnasium.farama.org/
 
 Installs:
-pip install pettingzoo[all]\
-pip install pygame\
+pip install pettingzoo[all]
+pip install pygame
