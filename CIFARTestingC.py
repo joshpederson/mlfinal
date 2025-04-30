@@ -90,80 +90,40 @@ class CIFARClassifier(nn.Module):
         #Kernel size for pooling: 2 with stride of 2. This halves the resolution
         #CHECK When to use dropout???
 
-        self.norm1 = nn.BatchNorm2d(num_features=3)
+        self.c1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=5, padding=2) #32x32
+        self.c2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1) #32x32
+        #Maxpool2d -> 16x16
+        self.c3 = nn.Conv2d(in_channels=32, out_channels=8, kernel_size=3) #14x14
+        #Maxpool2d -> 7x7
 
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=1, padding=1) #32x32
-        self.relu1 = nn.ReLU()
-
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1) #32x32
-        self.relu2 = nn.ReLU()
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2) #16x16
-
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1) #16x16
-        self.relu3 = nn.ReLU()
-
-        self.conv4 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1) #16x16
-        self.relu4 = nn.ReLU()
-        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2) #8x8
-
-        # self.conv5 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1, padding=1) #8x8
-        # self.relu5 = nn.ReLU()
-        #
         # #Flattening Occurs Here
-        #
+
         # #For fully connected layers it may be best to slowly decrease down to the class count
-        # self.cl1 = nn.Linear(in_features=512, out_features=256)
-        # self.relu6 = nn.ReLU()
-
-        self.cl2 = nn.Linear(in_features=256, out_features=128)
-        self.relu7 = nn.ReLU()
-
-        self.cl3 = nn.Linear(in_features=128, out_features=64)
-        self.relu8 = nn.ReLU()
-
-        self.cl4 = nn.Linear(in_features=64, out_features=32)
-        self.relu9 = nn.ReLU()
-
-        self.cl5 = nn.Linear(in_features=32, out_features=10)
-        self.soft = nn.Softmax() #Ending with softmax activation for better readability
+        self.a1 = nn.Linear(in_features=7 * 7 * 8, out_features=20)
+        self.a2 = nn.Linear(in_features=20, out_features=10)
 
     def forward(self, x):
-        out = self.norm1(x)
+        out = F.relu(self.c1(x))
 
-        out = self.conv1(out)
-        out = self.relu1(out)
+        out = F.relu(self.c2(out))
+        out = F.dropout2d(out, 0.1)
+        out = F.max_pool2d(out, 2, 2)
 
-        out = self.conv2(out)
-        out = self.relu2(out)
-        out = self.pool1(out)
+        out = F.relu(self.c3(out))
+        out = F.max_pool2d(out, 2, 2)
 
-        out = self.conv3(out)
-        out = self.relu3(out)
+        #Betanski uses this before flattening. It automatically shrinks the image to the amount of features
+        # needed for the first ann layer. However, if they are already the same size, it will crash.
+        #out = F.avg_pool2d(out, out.size()[3])
 
-        out = self.conv4(out)
-        out = self.relu4(out)
-        out = self.pool2(out)
+        #TWO METHODS OF FLATTENING
+        #out = out.view(out.size(0), -1)
+        out = torch.flatten(out, 1)
 
-        #out = self.conv5(out)
-        #out = self.relu5(out)
+        out = F.relu(self.a1(out))
 
-        out = F.avg_pool2d(out, out.size()[3])
-        out = out.view(out.size(0), -1)
+        out = self.a2(out)
 
-        #out = self.cl1(out)
-        #out = self.relu6(out)
-
-        out = self.cl2(out)
-        out = self.relu7(out)
-
-        out = self.cl3(out)
-        out = self.relu8(out)
-
-        out = self.cl4(out)
-        out = self.relu9(out)
-
-        out = self.cl5(out)
-        out = self.soft(out)
         return out
 
 def train(epochs=5, batch_size=16, lr=0.001, display_test_acc=False):
@@ -206,7 +166,7 @@ def train(epochs=5, batch_size=16, lr=0.001, display_test_acc=False):
                 correct = (predictions == cifar.test_labels.to(device)).sum().item()
                 print(f"Accuracy on test set: {correct / len(cifar.test_labels):.4f}")
 
-train(epochs=20, display_test_acc=True)
+train(epochs=50, display_test_acc=True)
 
 # TO SHOW AN IMAGE:
 #nnData = CIFARData()
@@ -218,6 +178,7 @@ train(epochs=20, display_test_acc=True)
 #Accuracy 67.02% 4/29/2025 3:49AM: I included all 5 training batches and removed the random color copies.
 #Accuracy 39.46% Epoch 12 4/29/2025 4:45AM: Tested out my own model
 #Accuracy 47.28% Epoch 16 4/29/2025 5:15AM: Trimmed Model Slightly
+#Accuracy 54.00% Epoch 20 4/30/2025 1:46PM: Copied Dutter's MNIST CNN Exactly
 
 
 
