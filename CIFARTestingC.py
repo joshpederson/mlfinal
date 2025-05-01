@@ -1,80 +1,206 @@
-import pandas as pd
+# https://www.digitalocean.com/community/tutorials/writing-resnet-from-scratch-in-pytorch
+
 import numpy as np
 import torch
-from PyQt5.sip import voidptr
-from torch import nn
-from torch.nn import functional as F
-from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
-import pickle
-from PIL import Image
-import random
+import torch.nn as nn
+from torchvision import datasets
+from torchvision import transforms
+from torch.utils.data.sampler import SubsetRandomSampler
 
-label_names = ['airplane', 'automobile', 'bird',
-               'cat', 'deer', 'dog', 'frog',
-               'horse', 'ship', 'truck']
+# Enable CUDA if running on a supported machine.
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"CPU or CUDA being used: {device}")
 
-def unpickle(file) -> dict:
-    with open(file, 'rb') as fo:
-        data = pickle.load(fo, encoding='bytes')
-    return data
+def data_loader(data_dir, batch_size, random_seed=42, valid_size=0.1, shuffle=True, test=False):
+    normalize = transforms.Normalize(
+        mean=[0.4914, 0.4822, 0.4465],
+        std=[0.2023, 0.1994, 0.2010]
+    )
 
-def show_image(data):
-    red = data[0]
-    green = data[1]
-    blue = data[2]
-    rgb = np.zeros((32, 32, 3), dtype=np.uint8)
-    for y in range(0, 32):
-        for x in range(0, 32):
-            rgb[x, y] = [red[x * 32 + y],
-                blue[x * 32 + y],
-                green[x * 32 + y]]
-    img = Image.fromarray(rgb)
-    img.show()
+    # Define Transforms
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        normalize,
+    ])
 
-def augment_data(data):
-    num_entries = data.shape[0]
-    new_data = np.zeros((num_entries * 9, 3072))
+    # Load the Test data for validation
+    if test:
+        dataset  = datasets.CIFAR10(root=data_dir, train=False, download=True, transform=transform)
+        data_loader  = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+        return data_loader
 
-    for i in range(0, num_entries):
-        new_data[i * 9] = data[i]
-        for j in range(1, 9):
-            new_data[i * 9 + j][:1024] = data[i][:1024] * (random.randrange(0, 200) / 100.0)
-            new_data[i * 9 + j][1024:2048] = data[i][1024:2048] * (random.randrange(0, 200) / 100.0)
-            new_data[i * 9 + j][2048:] = data[i][2048:] * (random.randrange(0, 200) / 100.0)
+    # Load the Train data
+    train_dataset  = datasets.CIFAR10(root=data_dir, train=True, download=True, transform=transform)
+    valid_dataset  = datasets.CIFAR10(root=data_dir, train=True, download=True, transform=transform)
 
-    return new_data
+    num_train  = len(train_dataset)
+    indices  = list(range(num_train))
+    split = int(np.floor(valid_size * num_train))
 
-class CIFARData(Dataset):
-    # https://www.cs.toronto.edu/~kriz/cifar.html
-    def __init__(self):
-        batch = (unpickle('data/data_batch_1') |
-                 unpickle('data/data_batch_2') |
-                 unpickle('data/data_batch_3') |
-                 unpickle('data/data_batch_4') |
-                 unpickle('data/data_batch_5'))
+    if shuffle:
+        np.random.seed(42)
+        np.random.shuffle(indices)
 
-        self.train_data = torch.tensor(batch.get(b'data') / 255.0, dtype=torch.float).view(-1, 3, 32, 32)
-        self.train_labels = torch.tensor(batch.get(b'labels'), dtype=torch.uint8)
+    train_idx, valid_idx = indices[split:], indices[:split]
+    train_sampler = SubsetRandomSampler(train_idx)
+    valid_sampler = SubsetRandomSampler(valid_idx)
 
-        test = unpickle('data/test_batch')
-        self.test_data = torch.tensor(test.get(b'data') / 255.0, dtype=torch.float).view(-1, 3, 32, 32)
-        self.test_labels = torch.tensor(test.get(b'labels'), dtype=torch.uint8)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, sampler=train_sampler)
+    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_size, sampler=valid_sampler)
 
-        self.len = len(self.train_labels)
+    return train_loader, valid_loader
 
-    def __getitem__(self, item):
-        return self.train_data[item], self.train_labels[item]
+train_loader, valid_loader = data_loader(data_dir='./data', batch_size=64)
+test_loader = data_loader(data_dir='./data', batch_size=64, test=True)
 
-    def __len__(self):
-        return self.len
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride = 1 , downsample = None):
+        super(ResidualBlock, self).__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size = 3, stride = stride, padding = 1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU())
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, kernel_size = 3, stride = 1, padding = 1),
+            nn.BatchNorm2d(out_channels))
+        self.downsample = downsample
+        self.relu = nn.ReLU()
+        self.out_channels = out_channels
 
-class CIFARClassifier(nn.Module):
-    # Network architecture from: https://paperswithcode.com/paper/how-important-is-weight-symmetry-in
+    def forward(self, x):
+        residual = x
+        out = self.conv1(x)
+        out = self.conv2(out)
+        if self.downsample:
+            residual = self.downsample(x)
+        out += residual
+        out = self.relu(out)
+        return out
 
-    def __init__(self):
-        super(CIFARClassifier, self).__init__()
+class ResNet(nn.Module):
+    def __init__(self, block, layers, num_classes = 10):
+        super(ResNet, self).__init__()
+        self.inplanes = 64
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size = 7, stride = 2, padding = 3),
+            nn.BatchNorm2d(64),
+            nn.ReLU())
+        self.maxpool = nn.MaxPool2d(kernel_size = 3, stride = 2, padding = 1)
 
+        self.layer0 = self._make_layer(block, 64, layers[0], stride = 1)
+        self.layer1 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer2 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer3 = self._make_layer(block, 512, layers[2], stride=2)
+
+        self.avgpool = nn.AvgPool2d(7, stride = 1)
+        self.fc = nn.Linear(512, num_classes)
+
+    def _make_layer(self, block, planes, blocks, stride = 1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes, kernel_size = 1, stride = stride),
+                nn.BatchNorm2d(planes))
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+
+        self.inplanes = planes
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.maxpool(x)
+
+        x = self.layer0(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+# Declare Hyperparameters
+num_classes = 10
+num_epochs = 20
+batch_size = 16
+learning_rate = 0.01
+
+# Create the ResNet-34 model
+model = ResNet(ResidualBlock, [3, 4, 6, 3]).to(device)
+
+# Loss & Optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay = 0.001, momentum = 0.9)
+
+# Train the model
+import gc
+total_step = len(train_loader)
+
+for epoch in range(num_epochs):
+    for i, (images, labels) in enumerate(train_loader):
+        images = images.to(device)
+        labels = labels.to(device)
+
+        # Forward Pass
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        # Backward Propagation & Optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # Cleanup
+        del images, labels, outputs
+        torch.cuda.empty_cache()
+        gc.collect()
+
+    print('Epoch [{}/{}] Loss: {:.4f}'.format(epoch+1, num_epochs, loss.item()))
+
+    # Validation
+    with torch.no_grad():
+        correct = 0
+        total = 0
+
+        for images, labels in valid_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+            del images, labels, outputs
+
+        print('Accuracy on Validation Set: {}%'.format(100 * correct / total))
+
+with torch.no_grad():
+    correct = 0
+    total = 0
+
+    for images, labels in valid_loader:
+        images = images.to(device)
+        labels = labels.to(device)
+        outputs = model(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        del images, labels, outputs
+
+    print('Accuracy on Test Set: {}%'.format(100 * correct / total))
+
+#Accuracy 67.02% 4/29/2025 3:49AM: I included all 5 training batches and removed the random color copies.
+#Accuracy 39.46% Epoch 12 4/29/2025 4:45AM: Tested out my own model
+#Accuracy 47.28% Epoch 16 4/29/2025 5:15AM: Trimmed Model Slightly
+#Accuracy 54.00% Epoch 20 4/30/2025 1:46PM: Copied Dutter's MNIST CNN Exactly
+
+#TIPS*********************************************************************************************************
         #Out_Channel/Num of filters: Double in output 1 convolutional layer at a time
             #Suggests having final layer produce 512+ channels
         #kernel size: 3 is typically the sweet spot
@@ -90,27 +216,7 @@ class CIFARClassifier(nn.Module):
         #Kernel size for pooling: 2 with stride of 2. This halves the resolution
         #CHECK When to use dropout???
 
-        self.c1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=5, padding=2) #32x32
-        self.c2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1) #32x32
-        #Maxpool2d -> 16x16
-        self.c3 = nn.Conv2d(in_channels=32, out_channels=8, kernel_size=3) #14x14
-        #Maxpool2d -> 7x7
 
-        # #Flattening Occurs Here
-
-        # #For fully connected layers it may be best to slowly decrease down to the class count
-        self.a1 = nn.Linear(in_features=7 * 7 * 8, out_features=20)
-        self.a2 = nn.Linear(in_features=20, out_features=10)
-
-    def forward(self, x):
-        out = F.relu(self.c1(x))
-
-        out = F.relu(self.c2(out))
-        out = F.dropout2d(out, 0.1)
-        out = F.max_pool2d(out, 2, 2)
-
-        out = F.relu(self.c3(out))
-        out = F.max_pool2d(out, 2, 2)
 
         #Betanski uses this before flattening. It automatically shrinks the image to the amount of features
         # needed for the first ann layer. However, if they are already the same size, it will crash.
@@ -118,67 +224,8 @@ class CIFARClassifier(nn.Module):
 
         #TWO METHODS OF FLATTENING
         #out = out.view(out.size(0), -1)
-        out = torch.flatten(out, 1)
+        #out = torch.flatten(out, 1)
 
-        out = F.relu(self.a1(out))
-
-        out = self.a2(out)
-
-        return out
-
-def train(epochs=5, batch_size=16, lr=0.001, display_test_acc=False):
-    cifar = CIFARData()
-    cifar_loader = DataLoader(cifar, batch_size=batch_size, drop_last=True, shuffle=True)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #device = "cpu"
-
-    classifier = CIFARClassifier().to(device)
-    print(f"Total Parameters: {sum(param.numel() for param in classifier.parameters())}")
-
-    cross_entropy = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(classifier.parameters(), lr=lr)
-
-    running_loss = 0.0
-    for epoch in range(epochs):
-        print(f"Epoch {epoch + 1} of {epochs}")
-
-        for _, data in enumerate(tqdm(cifar_loader)):
-            x, y = data
-            x = x.to(device)
-            y = y.to(device)
-
-            optimizer.zero_grad()
-
-            output = classifier(x)
-
-            loss = cross_entropy(output, y)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-
-        print(f"Running loss for epoch {epoch + 1}: {running_loss:.4f}")
-        running_loss = 0.0
-        if display_test_acc:
-            with torch.no_grad():
-                predictions = torch.argmax(classifier(cifar.test_data.to(device)), dim=1)
-                correct = (predictions == cifar.test_labels.to(device)).sum().item()
-                print(f"Accuracy on test set: {correct / len(cifar.test_labels):.4f}")
-
-train(epochs=50, display_test_acc=True)
-
-# TO SHOW AN IMAGE:
-#nnData = CIFARData()
-#new_data, new_label = nnData[0]
-#print(label_names[new_label])
-#show_image(torch.flatten(new_data, 1) * 255.0)
-
-
-#Accuracy 67.02% 4/29/2025 3:49AM: I included all 5 training batches and removed the random color copies.
-#Accuracy 39.46% Epoch 12 4/29/2025 4:45AM: Tested out my own model
-#Accuracy 47.28% Epoch 16 4/29/2025 5:15AM: Trimmed Model Slightly
-#Accuracy 54.00% Epoch 20 4/30/2025 1:46PM: Copied Dutter's MNIST CNN Exactly
 
 
 
