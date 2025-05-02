@@ -11,6 +11,8 @@ from ResNet import ResNet as RN, ResidualBlock as RB, ResNetLayer
 
 # Enable CUDA if running on a supported machine.
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"CPU or CUDA being used: {device}")
+
 
 def data_loader(data_dir, batch_size, random_seed=42, valid_size=0.1, shuffle=True, test=False):
     normalize = transforms.Normalize(
