@@ -7,6 +7,8 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 
+from ResNet import ResNet as RN, ResidualBlock as RB, ResNetLayer
+
 # Enable CUDA if running on a supported machine.
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -127,15 +129,22 @@ class ResNet(nn.Module):
 
 # Declare Hyperparameters
 num_classes = 10
-num_epochs = 20
+num_epochs = 40
 batch_size = 16
 learning_rate = 0.01
 
-# Create the ResNet-34 model
-model = ResNet(ResidualBlock, [3, 4, 6, 3]).to(device)
+# Create the ResNet-34 Model
+model = RN(in_channels= 3, num_classes = 10, layers = [
+    ResNetLayer(block = RB, num_blocks = 3, planes = 64, stride = 1),
+    ResNetLayer(block = RB, num_blocks = 4, planes = 128, stride = 2),
+    ResNetLayer(block = RB, num_blocks = 6, planes = 256, stride = 2),
+    ResNetLayer(block = RB, num_blocks = 3, planes = 512, stride = 2)
+]).to(device)
 
 # Loss & Optimizer
 criterion = nn.CrossEntropyLoss()
+# ADAM reached a peak of ~62% after 40 epochs
+# SGD reached a peak of ~84% after 30 epochs
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay = 0.001, momentum = 0.9)
 
 # Train the model
