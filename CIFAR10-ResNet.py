@@ -7,7 +7,7 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from ResNet import ResNet as RN, ResidualBlock as RB, ResNetLayer
+from ResNet import ResNet as RN, ResidualBlock as RB, BottleneckBlock as BB, ResiduaLayer, BottleneckLayer
 
 # Enable CUDA if running on a supported machine.
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -54,8 +54,8 @@ def data_loader(data_dir, batch_size, random_seed=42, valid_size=0.1, shuffle=Tr
 
     return train_loader, valid_loader
 
-train_loader, valid_loader = data_loader(data_dir='./data', batch_size=64)
-test_loader = data_loader(data_dir='./data', batch_size=64, test=True)
+train_loader, valid_loader = data_loader(data_dir='./data', batch_size=32)
+test_loader = data_loader(data_dir='./data', batch_size=32, test=True)
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride = 1 , downsample = None):
@@ -137,11 +137,16 @@ learning_rate = 0.01
 
 # Create the ResNet-34 Model
 model = RN(in_channels= 3, num_classes = 10, layers = [
-    ResNetLayer(block = RB, num_blocks = 3, planes = 64, stride = 1),
-    ResNetLayer(block = RB, num_blocks = 4, planes = 128, stride = 2),
-    ResNetLayer(block = RB, num_blocks = 6, planes = 256, stride = 2),
-    ResNetLayer(block = RB, num_blocks = 3, planes = 512, stride = 2)
+    BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
+    BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
+    BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
+    BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
 ]).to(device)
+
+#input_names = ["Image"]
+#output_names = ["Image Prediction"]
+
+#torch.onnx.export(model, train_loader.dataset.__getitem__(0)[0].to(device), "model.onnx", input_names=input_names, output_names=output_names)
 
 # Loss & Optimizer
 criterion = nn.CrossEntropyLoss()
