@@ -1,5 +1,5 @@
 # https://www.digitalocean.com/community/tutorials/writing-resnet-from-scratch-in-pytorch
-
+import PIL.Image
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,7 +7,7 @@ from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from ResNet import ResNet as RN, ResidualBlock as RB, BottleneckBlock as BB, ResiduaLayer, BottleneckLayer
+from ResNet import ResNet, ResidualBlock, BottleneckBlock, ResiduaLayer, BottleneckLayer
 
 # Enable CUDA if running on a supported machine.
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -24,7 +24,7 @@ def data_loader(data_dir, batch_size, random_seed=42, valid_size=0.1, shuffle=Tr
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        normalize,
+        normalize
     ])
 
     # Load the Test data for validation
@@ -57,101 +57,65 @@ def data_loader(data_dir, batch_size, random_seed=42, valid_size=0.1, shuffle=Tr
 train_loader, valid_loader = data_loader(data_dir='./data', batch_size=32)
 test_loader = data_loader(data_dir='./data', batch_size=32, test=True)
 
-class ResidualBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride = 1 , downsample = None):
-        super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size = 3, stride = stride, padding = 1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU())
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(out_channels, out_channels, kernel_size = 3, stride = 1, padding = 1),
-            nn.BatchNorm2d(out_channels))
-        self.downsample = downsample
-        self.relu = nn.ReLU()
-        self.out_channels = out_channels
-
-    def forward(self, x):
-        residual = x
-        out = self.conv1(x)
-        out = self.conv2(out)
-        if self.downsample:
-            residual = self.downsample(x)
-        out += residual
-        out = self.relu(out)
-        return out
-
-class ResNet(nn.Module):
-    def __init__(self, block, layers, num_classes = 10):
-        super(ResNet, self).__init__()
-        self.inplanes = 64
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size = 7, stride = 2, padding = 3),
-            nn.BatchNorm2d(64),
-            nn.ReLU())
-        self.maxpool = nn.MaxPool2d(kernel_size = 3, stride = 2, padding = 1)
-
-        self.layer0 = self._make_layer(block, 64, layers[0], stride = 1)
-        self.layer1 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer2 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer3 = self._make_layer(block, 512, layers[2], stride=2)
-
-        self.avgpool = nn.AvgPool2d(7, stride = 1)
-        self.fc = nn.Linear(512, num_classes)
-
-    def _make_layer(self, block, planes, blocks, stride = 1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes, kernel_size = 1, stride = stride),
-                nn.BatchNorm2d(planes))
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-
-        self.inplanes = planes
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.maxpool(x)
-
-        x = self.layer0(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
-
 # Declare Hyperparameters
 num_classes = 10
 num_epochs = 40
 batch_size = 16
 learning_rate = 0.01
 
+def augment_data(data):
+    augmented_data = torch.empty((data.size()[0], 3 * 9, 224, 224))
+    for i in range(0, data.size()[0]):
+        for j in range(0, 8):
+            transform = transforms.Compose([
+                transforms.RandomCrop(180),
+                transforms.RandomAffine(5, shear=5),
+                transforms.RandomAdjustSharpness(2),
+                transforms.RandomAutocontrast(0.33),
+                transforms.Resize((224, 224))
+            ])
+            transformed = transform(data[i])
+            augmented_data[i, j*3] = transformed[0]
+            augmented_data[i, j*3 + 1] = transformed[1]
+            augmented_data[i, j*3 + 2] = transformed[2]
+
+    return augmented_data.to(device)
+
 # Create the ResNet-34 Model
-model = RN(in_channels= 3, num_classes = 10, layers = [
-    BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
-    BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
-    BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
-    BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
-]).to(device)
+# To disable data augmentation (for ResNet-34 or ResNet-50), remove the preprocess argument at the end of the constructor,
+# and change the in_channels to 3 instead of 27
+model = ResNet(in_channels= 27, num_classes = 10, layers = [
+    ResiduaLayer(block = ResidualBlock, num_blocks = 3, in_planes = 64, out_planes = 64, stride = 1),
+    ResiduaLayer(block = ResidualBlock, num_blocks = 4, in_planes = 64, out_planes = 128, stride = 2),
+    ResiduaLayer(block = ResidualBlock, num_blocks = 6, in_planes = 128, out_planes = 256, stride = 2),
+    ResiduaLayer(block = ResidualBlock, num_blocks = 3, in_planes = 256, out_planes = 512, stride = 2)
+    # BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
+    # BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
+    # BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
+    # BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
+], preprocess=augment_data
+).to(device)
 
-#input_names = ["Image"]
-#output_names = ["Image Prediction"]
-
-#torch.onnx.export(model, train_loader.dataset.__getitem__(0)[0].to(device), "model.onnx", input_names=input_names, output_names=output_names)
+# Create the ResNet-50 Model
+# To make ResNet-101 or 152, change the num_blocks to { 3, 4, 23, 3 } or { 3, 8, 36, 3 }, respectively
+# model = ResNet(in_channels= 27, num_classes = 10, layers = [
+#     BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
+#     BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
+#     BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
+#     BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
+# ], preprocess=augment_data
+# ).to(device)
 
 # Loss & Optimizer
 criterion = nn.CrossEntropyLoss()
-# ADAM reached a peak of ~62% after 40 epochs
-# SGD reached a peak of ~84% after 30 epochs
+# ADAM reached a peak of ~62% after 40 epochs on ResNet-34 w/o Data Aug
+# SGD reached a peak of ~84% after 30 epochs on ResNet-34 w/o Data Aug
+# SGD reached a peak of ~76% after 24 epochs on ResNet-34 w/ Data Aug
+# SGD reached a peak of ~68% after 40 epochs on ResNet-34 w/ torchvision's built in CIFAR-10 Data Aug
+
+# SGD reached a peak of ~82% after 40 epochs on ResNet-50 w/o Data Aug
+# SGD reached a peak of ~82% after 40 epochs on ResNet-101 w/o Data Aug
+# SGD took too long to run for ResNet-152 (3 hours per Epoch on GPU)
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay = 0.001, momentum = 0.9)
 
 # Train the model

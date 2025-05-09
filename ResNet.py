@@ -118,7 +118,7 @@ class BottleneckLayer(ResiduaLayer):
         return nn.Sequential(*blocks)
 
 class ResNet(nn.Module):
-    def __init__(self, in_channels : int, num_classes: int, layers: List[ResiduaLayer], preprocess: nn.Module = None, postprocess: nn.Module = None):
+    def __init__(self, in_channels : int, num_classes: int, layers: List[ResiduaLayer], preprocess: callable = None, postprocess: callable = None):
         super(ResNet, self).__init__()
 
         if len(layers) == 0:
