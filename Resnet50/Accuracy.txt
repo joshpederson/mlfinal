@@ -1,0 +1,49 @@
+Accuracy on Validation Set: 70.38%
+Epoch [18/40] Loss: 0.8416
+Accuracy on Validation Set: 70.42%
+Epoch [19/40] Loss: 0.4342
+Accuracy on Validation Set: 70.46%
+Epoch [20/40] Loss: 0.9715
+Accuracy on Validation Set: 73.08%
+Epoch [21/40] Loss: 0.7787
+Accuracy on Validation Set: 72.0%
+Epoch [22/40] Loss: 0.9905
+Accuracy on Validation Set: 71.2%
+Epoch [23/40] Loss: 0.2117
+Accuracy on Validation Set: 70.4%
+Epoch [24/40] Loss: 1.4615
+Accuracy on Validation Set: 72.28%
+Epoch [25/40] Loss: 1.5575
+Accuracy on Validation Set: 73.28%
+Epoch [26/40] Loss: 0.1763
+Accuracy on Validation Set: 71.96%
+Epoch [27/40] Loss: 0.8778
+Accuracy on Validation Set: 73.2%
+Epoch [28/40] Loss: 1.3499
+Accuracy on Validation Set: 74.0%
+Epoch [29/40] Loss: 1.4490
+Accuracy on Validation Set: 73.68%
+Epoch [30/40] Loss: 1.2021
+Accuracy on Validation Set: 72.82%
+Epoch [31/40] Loss: 0.4867
+Accuracy on Validation Set: 74.96%
+Epoch [32/40] Loss: 1.4376
+Accuracy on Validation Set: 74.54%
+Epoch [33/40] Loss: 1.5949
+Accuracy on Validation Set: 72.94%
+Epoch [34/40] Loss: 1.4612
+Accuracy on Validation Set: 73.88%
+Epoch [35/40] Loss: 1.2348
+Accuracy on Validation Set: 72.66%
+Epoch [36/40] Loss: 0.4807
+Accuracy on Validation Set: 75.76%
+Epoch [37/40] Loss: 0.6158
+Accuracy on Validation Set: 74.26%
+Epoch [38/40] Loss: 1.7004
+Accuracy on Validation Set: 74.54%
+Epoch [39/40] Loss: 0.6672
+Accuracy on Validation Set: 74.34%
+Epoch [40/40] Loss: 0.4631
+Accuracy on Validation Set: 74.54%
+Model saved as Resnet50/resnet50_cifar10_full.pth
+Accuracy on Test Set: 74.86%
