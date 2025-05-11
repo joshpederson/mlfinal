@@ -61,7 +61,7 @@ test_loader = data_loader(data_dir='./data', batch_size=32, test=True)
 
 # Declare Hyperparameters
 num_classes = 10
-num_epochs = 1
+num_epochs = 40
 batch_size = 16
 learning_rate = 0.01
 
