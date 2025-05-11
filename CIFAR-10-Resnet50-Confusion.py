@@ -8,6 +8,7 @@ from torchvision import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from Confusion_Matrix_Generator import ConfusionMatrixGenerator
 from tqdm import tqdm
+import os
 
 from ResNet import ResNet, ResidualBlock, BottleneckBlock, ResiduaLayer, BottleneckLayer
 
@@ -161,6 +162,10 @@ for epoch in range(num_epochs):
             del images, labels, outputs
 
         print('Accuracy on Validation Set: {}%'.format(100 * correct / total))
+
+os.makedirs("Resnet50", exist_ok=True)
+torch.save(model, "Resnet50/resnet50_cifar10_full.pth")
+print("Model saved as Resnet50/resnet50_cifar10_full.pth")
 
 with torch.no_grad():
     correct = 0
