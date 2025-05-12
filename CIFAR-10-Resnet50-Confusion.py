@@ -101,13 +101,23 @@ def augment_data(data):
 
 # Create the ResNet-50 Model
 # To make ResNet-101 or 152, change the num_blocks to { 3, 4, 23, 3 } or { 3, 8, 36, 3 }, respectively
+# # Non-Augmented
 model = ResNet(in_channels= 27, num_classes = 10, layers = [
     BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
     BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
     BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
     BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
-], preprocess=augment_data
-).to(device)
+]).to(device)
+
+# # Augmented
+# model = ResNet(in_channels= 27, num_classes = 10, layers = [
+#     BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
+#     BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
+#     BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
+#     BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
+# ], preprocess=augment_data
+# ).to(device)
+
 
 # Loss & Optimizer
 criterion = nn.CrossEntropyLoss()
@@ -163,9 +173,9 @@ for epoch in range(num_epochs):
 
         print('Accuracy on Validation Set: {}%'.format(100 * correct / total))
 
-os.makedirs("Resnet50", exist_ok=True)
-torch.save(model, "Resnet50/resnet50_cifar10_full.pth")
-print("Model saved as Resnet50/resnet50_cifar10_full.pth")
+os.makedirs("Resnet50NonAugment", exist_ok=True)
+torch.save(model, "Resnet50NonAugment/resnet50_cifar10_full.pth")
+print("Model saved as Resnet50NonAugment/resnet50_cifar10_full.pth")
 
 with torch.no_grad():
     correct = 0
