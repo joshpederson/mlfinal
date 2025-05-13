@@ -15,11 +15,23 @@ class ImageAugmentationVisualizer:
         """
         self.transformations = transformations or [
             ("Original", transforms.Compose([])),
-            ("Random Crop", transforms.RandomCrop(180)),
-            ("Random Affine", transforms.RandomAffine(5, shear=5)),
-            ("Random Sharpness", transforms.RandomAdjustSharpness(2)),
-            ("Random Autocontrast", transforms.RandomAutocontrast(0.33)),
-            ("Resize", transforms.Resize((224, 224)))
+            ("Resize", transforms.Resize((224, 224))),
+            ("Random Crop", transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.RandomCrop(180)
+            ])),
+            ("Random Affine", transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.RandomAffine(5, shear=5)
+            ])),
+            ("Random Sharpness", transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.RandomAdjustSharpness(2)
+            ])),
+            ("Random Autocontrast", transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.RandomAutocontrast(0.33)
+            ])),
         ]
 
     def visualize(self, image=None, image_path=None):
@@ -82,3 +94,21 @@ class ImageAugmentationVisualizer:
 
         # Visualize the transformations
         self.visualize(image=image)
+
+
+from Visualizer import ImageAugmentationVisualizer
+from torchvision import datasets, transforms
+
+# Load your dataset (no transform needed for visualization)
+dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transforms.ToTensor())
+
+# Initialize the visualizer
+visualizer = ImageAugmentationVisualizer()
+
+# Get all class names
+class_names = dataset.classes
+
+# For each category, visualize a random image and its augmentation steps
+for label in class_names:
+    print(f"Visualizing augmentations for label: {label}")
+    visualizer.visualizeRandom(dataset, label)
