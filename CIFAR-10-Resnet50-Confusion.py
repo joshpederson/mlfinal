@@ -99,25 +99,42 @@ def augment_data(data):
 # ], preprocess=augment_data
 # ).to(device)
 
+
+# model = ResNet(in_channels= 3, num_classes = 10, layers = [
+#     ResiduaLayer(block = ResidualBlock, num_blocks = 3, in_planes = 64, out_planes = 64, stride = 1),
+#     ResiduaLayer(block = ResidualBlock, num_blocks = 4, in_planes = 64, out_planes = 128, stride = 2),
+#     ResiduaLayer(block = ResidualBlock, num_blocks = 6, in_planes = 128, out_planes = 256, stride = 2),
+#     ResiduaLayer(block = ResidualBlock, num_blocks = 3, in_planes = 256, out_planes = 512, stride = 2)
+#     # BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
+#     # BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
+#     # BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
+#     # BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
+# ]
+# ).to(device)
+
+
+
 # Create the ResNet-50 Model
 # To make ResNet-101 or 152, change the num_blocks to { 3, 4, 23, 3 } or { 3, 8, 36, 3 }, respectively
 # # Non-Augmented
-model = ResNet(in_channels= 3, num_classes = 10, layers = [
-    BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
-    BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
-    BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
-    BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
-]).to(device)
-
-# # Augmented
-# model = ResNet(in_channels= 27, num_classes = 10, layers = [
+# model = ResNet(in_channels= 3, num_classes = 10, layers = [
 #     BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
 #     BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
 #     BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
 #     BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
-# ], preprocess=augment_data
-# ).to(device)
+# ]).to(device)
 
+# Augmented
+model = ResNet(in_channels= 27, num_classes = 10, layers = [
+    BottleneckLayer(num_blocks = 3, in_planes = 64, out_planes = 256, reduction_planes=64, stride = 1),
+    BottleneckLayer(num_blocks = 4, in_planes = 256, out_planes = 512, reduction_planes=128, stride = 2),
+    BottleneckLayer(num_blocks = 6, in_planes = 512, out_planes = 1024, reduction_planes=256, stride = 2),
+    BottleneckLayer(num_blocks = 3, in_planes = 1024, out_planes = 2048, reduction_planes=512, stride = 2)
+], preprocess=augment_data
+).to(device)
+
+total_params = sum(p.numel() for p in model.parameters())
+print(f"Total parameters: {total_params:,}")
 
 # Loss & Optimizer
 criterion = nn.CrossEntropyLoss()
